@@ -1,0 +1,24 @@
+# Environment and secrets
+.env
+*.pem
+*.key
+crypto-config/
+organizations/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Go
+vendor/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
