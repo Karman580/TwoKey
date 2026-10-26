@@ -1,0 +1,421 @@
+{
+ "params": {
+  "n": 1000000,
+  "prevalence": 0.002,
+  "cashoutMedianMinutes": 30,
+  "seed": 42,
+  "reportDelayMedianMinutes": 120,
+  "blanketHoldMinutes": 240,
+  "twokeyHoldMinutes": {
+   "MEDIUM": 30,
+   "HIGH": 240
+  },
+  "valueFloorRupees": 10000,
+  "assumptions": {
+   "genuineFlagRates": {
+    "long_standing": 0.55,
+    "new_acct": 0.03,
+    "first_payee": 0.12,
+    "fan_in": 0.01,
+    "split": 0.002,
+    "velocity": 0.005,
+    "pass_through": 0.01,
+    "anomaly": 0.02
+   },
+   "fraudFlagRates": {
+    "long_standing": 0.0,
+    "new_acct": 0.6,
+    "first_payee": 0.9,
+    "fan_in": 0.5,
+    "split": 0.15,
+    "velocity": 0.3,
+    "pass_through": 0.6,
+    "anomaly": 0.4
+   },
+   "genuineAmount": [
+    1500,
+    1.3
+   ],
+   "fraudAmount": [
+    25000,
+    1.0
+   ]
+  }
+ },
+ "headline": {
+  "statusQuo": {
+   "recoveryRatio": 0.1818336660908634,
+   "recalledWithinHold": 0.0,
+   "genuineDelayed": 0,
+   "genuineDelayedPct": 0.0
+  },
+  "blanket": {
+   "recoveryRatio": 0.7230027328324912,
+   "recalledWithinHold": 0.6717630436629659,
+   "genuineDelayed": 72090,
+   "genuineDelayedPct": 7.223765376429422
+  },
+  "twokey": {
+   "recoveryRatio": 0.6580052984344443,
+   "recalledWithinHold": 0.5828489893254599,
+   "genuineDelayed": 12953,
+   "genuineDelayedPct": 1.2979530159646318
+  },
+  "fraudCount": 2044,
+  "fraudHeldShare": 0.9427592954990215,
+  "twokeyRecoveryVsBlanket": 0.9101007071668901,
+  "twokeyDelayVsBlanket": 0.17967818005271188,
+  "meetsRecoveryTarget": true,
+  "meetsFrictionTarget": false,
+  "frontier": [
+   {
+    "policy": "blanket",
+    "label": "blanket >= Rs 2,000",
+    "recoveryRatio": 0.7460734394624275,
+    "recalledWithinHold": 0.6994013029216577,
+    "genuineDelayed": 412394,
+    "genuineDelayedPct": 41.323865982067346
+   },
+   {
+    "policy": "blanket",
+    "label": "blanket >= Rs 5,000",
+    "recoveryRatio": 0.7435376533062825,
+    "recalledWithinHold": 0.6958582161847321,
+    "genuineDelayed": 176937,
+    "genuineDelayedPct": 17.72993999735459
+   },
+   {
+    "policy": "blanket",
+    "label": "blanket >= Rs 10,000",
+    "recoveryRatio": 0.7230027328324912,
+    "recalledWithinHold": 0.6717630436629659,
+    "genuineDelayed": 72090,
+    "genuineDelayedPct": 7.223765376429422
+   },
+   {
+    "policy": "blanket",
+    "label": "blanket >= Rs 25,000",
+    "recoveryRatio": 0.6408337560383306,
+    "recalledWithinHold": 0.564301266933607,
+    "genuineDelayed": 15185,
+    "genuineDelayedPct": 1.5216101711899122
+   },
+   {
+    "policy": "blanket",
+    "label": "blanket >= Rs 50,000",
+    "recoveryRatio": 0.4891728072126752,
+    "recalledWithinHold": 0.3774769677926496,
+    "genuineDelayed": 3428,
+    "genuineDelayedPct": 0.34350211832986627
+   },
+   {
+    "policy": "twokey",
+    "label": "TwoKey HIGH only",
+    "recoveryRatio": 0.6405635978846086,
+    "recalledWithinHold": 0.5646016975580157,
+    "genuineDelayed": 186,
+    "genuineDelayedPct": 0.01863809626877337
+   },
+   {
+    "policy": "twokey",
+    "label": "TwoKey 15m/2h",
+    "recoveryRatio": 0.5073990974251318,
+    "recalledWithinHold": 0.4008187630673544,
+    "genuineDelayed": 12953,
+    "genuineDelayedPct": 1.2979530159646318
+   },
+   {
+    "policy": "twokey",
+    "label": "TwoKey 30m/4h",
+    "recoveryRatio": 0.6580052984344443,
+    "recalledWithinHold": 0.5828489893254599,
+    "genuineDelayed": 12953,
+    "genuineDelayedPct": 1.2979530159646318
+   },
+   {
+    "policy": "twokey",
+    "label": "TwoKey 4h/4h",
+    "recoveryRatio": 0.73701124738419,
+    "recalledWithinHold": 0.6893731825241708,
+    "genuineDelayed": 12953,
+    "genuineDelayedPct": 1.2979530159646318
+   },
+   {
+    "policy": "statusQuo",
+    "label": "status quo",
+    "recoveryRatio": 0.1818336660908634,
+    "recalledWithinHold": 0.0,
+    "genuineDelayed": 0,
+    "genuineDelayedPct": 0.0
+   }
+  ]
+ },
+ "disclaimer": "Synthetic data with assumed distributions. Illustrates the trade-off; not evidence of production performance.",
+ "sweep": [
+  {
+   "signal": "assumed",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.0,
+   "blanket": 0.7589820821769943,
+   "twokey": 0.6448513437438764,
+   "recoveryVsBlanket": 0.8496265707541399,
+   "delayVsBlanket": 0.1842061787543367,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.1663218594165734,
+   "blanket": 0.7056559386737896,
+   "twokey": 0.649862352938331,
+   "recoveryVsBlanket": 0.9209337260870827,
+   "delayVsBlanket": 0.18485473707689734,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.42076691769258023,
+   "blanket": 0.7625780435648353,
+   "twokey": 0.7378485000022277,
+   "recoveryVsBlanket": 0.9675711308877921,
+   "delayVsBlanket": 0.1807799442896936,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7836771066340995,
+   "blanket": 0.9215731857066459,
+   "twokey": 0.9284907111020412,
+   "recoveryVsBlanket": 1.0075062138337836,
+   "delayVsBlanket": 0.18242039634825205,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.033099396761679264,
+   "blanket": 0.6961035448912142,
+   "twokey": 0.623202815124451,
+   "recoveryVsBlanket": 0.8952731525334267,
+   "delayVsBlanket": 0.1819088240181687,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.17549084224136927,
+   "blanket": 0.7079628367012298,
+   "twokey": 0.6375759276780096,
+   "recoveryVsBlanket": 0.9005782431304026,
+   "delayVsBlanket": 0.1837828874640725,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.5002316439042118,
+   "blanket": 0.8040312607745096,
+   "twokey": 0.7720644077195465,
+   "recoveryVsBlanket": 0.9602417783803954,
+   "delayVsBlanket": 0.1815696993361968,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7651058925060378,
+   "blanket": 0.903552591396565,
+   "twokey": 0.8920338465088381,
+   "recoveryVsBlanket": 0.9872517161730198,
+   "delayVsBlanket": 0.18017618704637375,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.017759662991429642,
+   "blanket": 0.7157215255491403,
+   "twokey": 0.6112312451394463,
+   "recoveryVsBlanket": 0.8540070730309203,
+   "delayVsBlanket": 0.17933624845834734,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.18967755004366238,
+   "blanket": 0.7394933904629479,
+   "twokey": 0.6521648360692471,
+   "recoveryVsBlanket": 0.8819075930630966,
+   "delayVsBlanket": 0.18473074301295161,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.4742142262959942,
+   "blanket": 0.8245785203220994,
+   "twokey": 0.7826558851590906,
+   "recoveryVsBlanket": 0.9491587106263295,
+   "delayVsBlanket": 0.18473760769833278,
+   "meetsBoth": false
+  },
+  {
+   "signal": "assumed",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7531780110827654,
+   "blanket": 0.8894106585280255,
+   "twokey": 0.8697738987868145,
+   "recoveryVsBlanket": 0.9779216051067908,
+   "delayVsBlanket": 0.18600625418807237,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.01559217886306929,
+   "blanket": 0.6658982261851492,
+   "twokey": 0.20743222482327806,
+   "recoveryVsBlanket": 0.31150739957911033,
+   "delayVsBlanket": 0.184305967688757,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.14847365677122726,
+   "blanket": 0.8551869319609774,
+   "twokey": 0.3758509733475342,
+   "recoveryVsBlanket": 0.4394956930477096,
+   "delayVsBlanket": 0.18367121471579295,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.5329792298216893,
+   "blanket": 0.7844403081988041,
+   "twokey": 0.5901092368978822,
+   "recoveryVsBlanket": 0.7522678663120512,
+   "delayVsBlanket": 0.18299113654212948,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.0005,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7649511011996,
+   "blanket": 0.9055410160969586,
+   "twokey": 0.790090103351289,
+   "recoveryVsBlanket": 0.8725061474925969,
+   "delayVsBlanket": 0.18186940109301933,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.01926996847760461,
+   "blanket": 0.7320416210207882,
+   "twokey": 0.24171651832647104,
+   "recoveryVsBlanket": 0.33019504818511797,
+   "delayVsBlanket": 0.1802960581027887,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.17484536847869145,
+   "blanket": 0.7710199119420744,
+   "twokey": 0.35584693302513803,
+   "recoveryVsBlanket": 0.4615275526786555,
+   "delayVsBlanket": 0.18146177541304956,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.4992767073671262,
+   "blanket": 0.809681475326956,
+   "twokey": 0.5912575495994467,
+   "recoveryVsBlanket": 0.730234749857272,
+   "delayVsBlanket": 0.18363495059398247,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.002,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7427645671079303,
+   "blanket": 0.8803181815006925,
+   "twokey": 0.7946105231131427,
+   "recoveryVsBlanket": 0.9026401360455346,
+   "delayVsBlanket": 0.18432873066045583,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 5,
+   "statusQuo": 0.013856873138829018,
+   "blanket": 0.6701406362417656,
+   "twokey": 0.1955352009343173,
+   "recoveryVsBlanket": 0.2917823369597518,
+   "delayVsBlanket": 0.17902281556054056,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 30,
+   "statusQuo": 0.20420258293032667,
+   "blanket": 0.7658755398485745,
+   "twokey": 0.38871368492192276,
+   "recoveryVsBlanket": 0.5075415843660153,
+   "delayVsBlanket": 0.18798912138535828,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 120,
+   "statusQuo": 0.48095901092819715,
+   "blanket": 0.8109968030305721,
+   "twokey": 0.5855848912295679,
+   "recoveryVsBlanket": 0.722055733193184,
+   "delayVsBlanket": 0.1841927493807701,
+   "meetsBoth": false
+  },
+  {
+   "signal": "weak",
+   "prevalence": 0.005,
+   "cashoutMedianMinutes": 360,
+   "statusQuo": 0.7558253602740631,
+   "blanket": 0.9028991810122027,
+   "twokey": 0.8052124881771168,
+   "recoveryVsBlanket": 0.8918077511981201,
+   "delayVsBlanket": 0.18330155882023103,
+   "meetsBoth": false
+  }
+ ],
+ "seconds": 0.84
+}

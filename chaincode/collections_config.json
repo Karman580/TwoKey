@@ -1,0 +1,11 @@
+[
+  {
+    "name": "payerPayeeCollection",
+    "policy": "OR('PayerBankMSP.member', 'PayeeBankMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 1,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true
+  }
+]

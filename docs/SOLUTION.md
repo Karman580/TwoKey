@@ -61,14 +61,30 @@ Scale of the problem: the National Cybercrime Reporting Portal recorded about **
 
 | Component | Status |
 | --- | --- |
-| Problem validation, architecture, state machine, chaincode interface, endorsement and privacy model | Designed |
-| Risk features, tiering rules, simulator design, adversarial test plan | Designed |
-| Drunix network, chaincode, gateway | To be built (coding phase, week 1) |
-| Mock switch, core banking, end-to-end slice | To be built (week 2) |
-| Dashboard, simulator, frontier chart | To be built (week 3) |
-| Model tiers, fairness report, attack demos | Planned (week 4) |
+| `ConditionalCredit` state machine, endorsement rule, 4 h hold cap, idempotency, audit trail | ✅ Built and property-tested ([`chaincode/credit`](../chaincode/credit/credit.go)) |
+| Drunix/Fabric chaincode with state-based endorsement and private data | ✅ Written and compiles · ⚠️ not yet deployed on a Drunix network |
+| Signature-checking dev ledger (stand-in for Drunix in the local demo) | ✅ Built |
+| Rules-first risk tiers with reason codes and exemptions | ✅ Built |
+| Mock UPI switch, core banking, 1930 helpline, bank ops, NPCI ruling, keeper | ✅ Built (simulated rails) |
+| Dashboard with live credits, attack demos, audit trail, simulator | ✅ Built |
+| Policy simulator and frontier chart | ✅ Built; results below |
+| Fabric Gateway bridge, Drunix 3-org network, OC-215 timers | 🔜 Planned |
+| Model tiers (LightGBM + SHAP), segment fairness report | 🔜 Planned |
 
-All NPCI, bank and helpline components in the prototype are simulated. No real money or customer data is used.
+All NPCI, bank and helpline components are simulated. No real money or customer data is used.
+
+### The user journey, as implemented
+
+Meena's story above runs in the dashboard and in `make demo` with the same accounts: the nephew payment is LOW (long-standing beneficiary), and the "safe verification account" payment is HIGH with `NEW_ACCT`, `FIRST_PAYEE`, `HIGH_FAN_IN` and `PASS_THROUGH`. One difference from the story: the demo mule account has received money from 13 earlier payers, so Meena is the 14th.
+
+### Differences from the deck, and why
+
+| Deck / proposal | Implementation | Reason |
+| --- | --- | --- |
+| Smurfing raises the tier to HIGH | `SPLIT_PATTERN` alone gives MEDIUM; HIGH needs 3+ codes or `NEW_ACCT` + `HIGH_FAN_IN` | Follows the deck's own tier rule; a lone split pattern is weaker evidence |
+| "Release early" by the payee bank, and "every release needs both banks" | Early release needs an explicit approval from **each** bank | Satisfies both statements; neither bank releases alone |
+| Fabric Gateway (TypeScript) to Drunix peers | Python ledger client to a local signature-checking ledger | No Docker available in the build environment; same state-machine code |
+| Results "≥ 80% recovery, ≤ 10% delays" | These were hypotheses; measured results below (friction target missed by the default policy) | Report the result honestly |
 
 ## 8. Limitations
 
@@ -93,7 +109,20 @@ Method: three policies (status quo, blanket delay, TwoKey) on one million synthe
 Recovery ratio = (fraud value still held at report time) / (total fraud value)
 ```
 
-A negative result will be reported as such; the simulator and the jointly endorsed held-credit chaincode remain useful contributions to RBI's consultation either way.
+### Results (synthetic, `make simulate`, seed 42)
+
+1,000,000 transfers, 0.2% fraud, mule cash-out median 30 min; blanket lag = 4 h hold on every transfer ≥ ₹10,000.
+
+| Criterion | Target | Result |
+| --- | --- | --- |
+| Recovery vs blanket | ≥ 80% | **91.0%** ✅ (65.8% vs 72.3%; status quo 18.2%) |
+| Genuine transfers delayed vs blanket | ≤ 10% | **18.0%** ❌ (12,953 vs 72,090) |
+| Same, HIGH-tier holds only | | 88.6% recovery ✅, 0.3% delays ✅ |
+| Unilateral release or recall | Always rejected | ✅ Go tests, Python tests, live attack buttons |
+| Recall–expiry race, replays | 100% deterministic | ✅ 5,000 random sequences, run twice, identical |
+| End-to-end demo | Live | ✅ `make demo`, dashboard |
+
+**Negative and conditional results:** the default 30 min / 4 h policy misses the friction target, because MEDIUM holds on first-time payees catch more genuine payments than allowed. A HIGH-only policy meets both targets under the assumed distributions. When the mule signal is weakened, TwoKey recovers only 29–90% of the blanket lag's recovery across the sweep. The approach therefore depends on how separable real mule accounts are, which only bank data can show. The simulator and the jointly endorsed held-credit chaincode remain useful contributions to RBI's consultation either way.
 
 ## Sources
 

@@ -22,3 +22,11 @@ vendor/
 .DS_Store
 .vscode/
 .idea/
+
+# Local runtime
+.bin/
+.data/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+*.log

@@ -1,202 +1,203 @@
 # TwoKey — Architecture
 
-> **Status:** This document describes the designed architecture of the TwoKey prototype. Components are being implemented during the hackathon coding phase; see the [README roadmap](../README.md#roadmap). Everything labelled "mock" is a simulation and is never presented as a live NPCI, bank or Citi integration.
+This document describes **what is implemented** in this repository, then the planned Drunix deployment, kept clearly separate. Everything labelled *mock* is a simulation and is never presented as a live NPCI, bank or Citi integration.
 
 ## 1. Design principle
 
-Python services make every decision; Drunix holds only the shared state that two banks must agree on.
+Python services make every decision; the ledger holds only the shared state that two banks must agree on.
 
-A held UPI credit is effectively co-owned by two independent, regulated institutions with opposing incentives. The payer's bank wants funds returned to a victim; the payee's bank must protect its customer from wrongful reversal. TwoKey puts exactly that object — the `ConditionalCredit` — on a permissioned ledger where both banks must endorse every change.
+A held UPI credit is effectively co-owned by two regulated institutions with opposing incentives. The payer's bank wants funds returned to a victim; the payee's bank must protect its customer from wrongful reversal. TwoKey puts exactly that object, the `ConditionalCredit`, on a shared ledger where every change needs both banks.
 
-## 2. High-level architecture
+## 2. Implemented system
 
 ```mermaid
 flowchart TB
-  subgraph Clients
-    PA["Payer app (mock PSP)"]
-    HL["Mock 1930 helpline"]
-    DB["Dashboard"]
+  subgraph Browser
+    UI["Dashboard<br/>frontend/index.html · app.js"]
   end
-  subgraph Services["Off-chain services · Python, FastAPI"]
-    SW["Mock UPI switch<br/>OC-215 timers, routes by tier"]
-    RS["Risk-tier service<br/>rules + model, reason codes"]
-    BO["Bank ops<br/>recall, keeper, reconciliation"]
-    CB["Mock core banking<br/>credits, refunds"]
+  subgraph Services["FastAPI process · services/twokey/app.py · 127.0.0.1:8000"]
+    SW["Mock UPI switch<br/>POST /api/upi/pay"]
+    RS["Risk tiers<br/>risk.py"]
+    HL["Mock 1930<br/>POST /api/helpline/report"]
+    BO["Bank ops (PayerBank, PayeeBank)<br/>NPCI ruling"]
+    KP["Keeper thread<br/>expiry + reconciliation"]
+    CB["Mock core banking<br/>world.py: balances, held funds, history"]
+    LC["Ledger client + org keys<br/>ledger.py (Ed25519)"]
+    SIM["Policy simulator<br/>simulator.py"]
   end
-  GW["Fabric Gateway<br/>TypeScript REST bridge"]
-  RM["PostgreSQL read model"]
-  subgraph Drunix["Drunix network · 3 organisations"]
-    P1["PayerBank peer"]
-    P2["PayeeBank peer"]
-    P3["NPCI-observer peer"]
-    CC["ConditionalCredit chaincode (Go)<br/>AND(PayerBank, PayeeBank)"]
-    PDC["Private data collection<br/>VPAs, KYC refs"]
+  subgraph DL["Dev ledger · chaincode/cmd/devledger · 127.0.0.1:8081"]
+    VER["Verify signatures<br/>+ endorsement policy + replay guard"]
+    SM["credit.Apply / credit.NewHold<br/>chaincode/credit"]
+    LOG["Hash-chained log<br/>.data/ledger.jsonl"]
   end
-  PA --> SW
+  UI -->|JSON over HTTP| SW & HL & BO & SIM
   SW --> RS
-  SW -->|"LOW"| CB
-  SW -->|"CreateHold"| GW
-  HL -->|"report"| BO
-  BO -->|"recall, release, expire"| GW
-  BO --> CB
-  GW --> P1 & P2
-  P1 & P2 & P3 --- CC
-  CC --- PDC
-  CC -->|"events"| RM
-  RM --> DB
+  SW -->|LOW| CB
+  SW & HL & BO & KP --> LC
+  LC -->|"signed proposal"| VER --> SM --> LOG
+  KP --> CB
 ```
 
-## 3. Components and responsibilities
+| Component | File | Responsibility | Real or mock |
+| --- | --- | --- | --- |
+| State machine | [`chaincode/credit/credit.go`](../chaincode/credit/credit.go) | States, transitions, who may call what, hold cap, endorsement rule, audit events. Pure function of (credit, tx) | Real |
+| Drunix chaincode | [`chaincode/main.go`](../chaincode/main.go) | Maps the state machine onto the Fabric stub: MSP identity, tx timestamp, state-based endorsement per key, private data, `CreditChanged` events | Real code, **not yet deployed** |
+| Dev ledger | [`chaincode/cmd/devledger/main.go`](../chaincode/cmd/devledger/main.go) | Local stand-in for the network. Verifies Ed25519 endorsements, applies the same state machine, rejects replays, keeps a hash-chained append-only log and replays it on restart | Real, local only |
+| Risk tiers | [`services/twokey/risk.py`](../services/twokey/risk.py) | Seven reason codes → tier; exemptions; the same rule is vectorised for the simulator | Real (uncalibrated thresholds) |
+| Bank world | [`services/twokey/world.py`](../services/twokey/world.py) | Synthetic accounts and history, feature computation, balances and held funds, exactly-once settlement | Mock |
+| API | [`services/twokey/app.py`](../services/twokey/app.py) | Switch, risk, 1930, bank ops, NPCI, keeper, attack demos, simulator, demo controls | Real logic over mock rails |
+| Ledger client | [`services/twokey/ledger.py`](../services/twokey/ledger.py) | Builds and signs proposals, salted VPA hashing, error mapping | Real |
+| Simulator | [`services/twokey/simulator.py`](../services/twokey/simulator.py) | Status quo vs blanket lag vs TwoKey over synthetic transfers | Real code, synthetic data |
+| Dashboard | [`frontend/`](../frontend/) | Payment form, live credits with per-bank actions, attacks, audit trail, ledger and simulator views | Real |
 
-| Component | Responsibility | Built or mocked |
-| --- | --- | --- |
-| Payer app | Initiates a P2P payment | Mock |
-| Mock UPI switch | Accepts payments, enforces NPCI OC-215 response timers and status-check limits, routes LOW to instant credit and MEDIUM/HIGH to `CreateHold` | Mock (built) |
-| Risk-tier service | Computes features, returns tier, hold length and reason codes | Built |
-| Bank ops | Recall requests from 1930 reports, keeper for expiries, reconciliation across switch, ledger and core banking | Built |
-| Mock core banking | Simulated credits and refunds for both banks | Mock |
-| Mock 1930 helpline | Simulated victim complaints | Mock |
-| Fabric Gateway | REST bridge between Python services and Drunix | Built |
-| Drunix peers | PayerBank and PayeeBank endorse; NPCI-observer reads and co-signs disputes | Built (local network) |
-| `ConditionalCredit` chaincode | State machine, endorsement rules, private data | Built |
-| Read model and dashboard | PostgreSQL view of credits and metrics | Built |
-| Policy simulator | Synthetic population and policy comparison | Built |
-
-## 4. The ConditionalCredit state machine
+## 3. The ConditionalCredit state machine
 
 ```mermaid
 stateDiagram-v2
-  [*] --> PENDING: CreateHold (tier MEDIUM/HIGH)
-  PENDING --> RELEASED: Expire (timer) / ReleaseEarly (both banks)
-  PENDING --> RECALL_REQUESTED: RequestRecall (payer bank, after 1930 report)
-  RECALL_REQUESTED --> RECALLED: ConfirmRecall (both banks)
-  RECALL_REQUESTED --> DISPUTED: RaiseDispute
-  PENDING --> DISPUTED: RaiseDispute
-  DISPUTED --> RELEASED: resolved with NPCI-observer
-  DISPUTED --> RECALLED: resolved with NPCI-observer
+  [*] --> PENDING: CreateHold (MEDIUM/HIGH, both banks)
+  PENDING --> PENDING: ApproveRelease (first bank)
+  PENDING --> RELEASED: ApproveRelease (second bank)
+  PENDING --> RELEASED: Expire (now >= HoldUntil)
+  PENDING --> RECALL_REQUESTED: RequestRecall (payer bank, now < HoldUntil)
+  RECALL_REQUESTED --> RECALLED: ConfirmRecall (payee bank)
+  PENDING --> DISPUTED: RaiseDispute (either bank)
+  RECALL_REQUESTED --> DISPUTED: RaiseDispute (either bank)
+  DISPUTED --> RELEASED: ResolveDispute RELEASE (NPCI + both banks)
+  DISPUTED --> RECALLED: ResolveDispute RECALL (NPCI + both banks)
   RELEASED --> [*]
   RECALLED --> [*]
 ```
 
-LOW-tier transfers never enter the ledger; they credit instantly through the switch.
+LOW-tier transfers never touch the ledger. Rules enforced in [`credit.go`](../chaincode/credit/credit.go):
 
-### On-chain object (shared channel)
+| Function | Submitted by | Endorsement required | Extra rules |
+| --- | --- | --- | --- |
+| `CreateHold` | a party bank | payer bank AND payee bank | tier MEDIUM/HIGH, `0 < hold ≤ 4 h` (cap lives in chaincode), ≥ 1 reason code, different banks; idempotent per `txnRef` |
+| `RequestRecall` | payer bank only | both banks | only while `now < HoldUntil` |
+| `ConfirmRecall` | payee bank only | both banks | only from RECALL_REQUESTED |
+| `ApproveRelease` | either bank, once each | both banks | second distinct approval releases |
+| `Expire` | either bank (keeper) | both banks | only when `now ≥ HoldUntil` |
+| `RaiseDispute` | either bank | both banks | reason required; freezes the credit |
+| `ResolveDispute` | NPCI observer only | both banks AND NPCI | outcome RELEASE or RECALL |
 
-```go
-type ConditionalCredit struct {
-    TxnRef      string   // UPI RRN; idempotency key
-    AmountPaise int64
-    PayerBankID string
-    PayeeBankID string
-    HashedPayer string   // salted hash of payer VPA
-    HashedPayee string   // salted hash of payee VPA
-    Tier        string   // MEDIUM | HIGH
-    ReasonCodes []string // e.g. NEW_ACCT, HIGH_FAN_IN
-    HoldUntil   int64    // unix seconds
-    State       string   // PENDING | RELEASED | RECALL_REQUESTED | RECALLED | DISPUTED
-    Events      []Event  // who, what, when
-}
+**Recall–expiry race.** Both use the same timestamp test with a strict boundary: a recall at `t < HoldUntil` wins and blocks expiry, and at `t ≥ HoldUntil` only expiry is valid. In Fabric, two conflicting transactions in the same block are resolved by MVCC; the second is invalidated.
+
+**Design decision (documented gap).** The proposal says "every release needs both banks' endorsement" and also that the payee bank can release early. The implementation reconciles the two: every transaction is endorsed by both banks, and an *early* release additionally needs an explicit `ApproveRelease` from each bank, so neither bank's operator can release on its own initiative.
+
+## 4. Main sequence: fraud path
+
+```mermaid
+sequenceDiagram
+  participant P as Payer app (dashboard)
+  participant S as Mock switch
+  participant R as Risk tiers
+  participant C as Ledger client
+  participant L as Dev ledger
+  participant H as Mock 1930
+  participant B as Mock core banking
+  P->>S: POST /api/upi/pay ₹40,000 to safe.verify@payeebank
+  S->>R: features → decide()
+  R-->>S: HIGH, 4h, [NEW_ACCT, FIRST_PAYEE, HIGH_FAN_IN, PASS_THROUGH]
+  S->>C: CreateHold (hashed VPAs only)
+  C->>L: proposal signed by PayerBank + PayeeBank
+  L-->>C: PENDING, new block
+  S->>B: debit payer, add to payee's held funds
+  H->>C: RequestRecall as PayerBank (complaint ref)
+  C->>L: signed by both banks
+  L-->>C: RECALL_REQUESTED
+  P->>C: ConfirmRecall as PayeeBank
+  C->>L: signed by both banks
+  L-->>C: RECALLED
+  C->>B: settle(): release held funds back to payer (exactly once)
 ```
 
-### Endorsement policies
+**Normal path:** after `HoldUntil` the keeper thread ([`TwoKey.keeper_once`](../services/twokey/app.py)) submits `Expire`, and `world.settle` moves the held funds into the payee's balance. The same loop reconciles any final ledger state that core banking has not applied yet, for example after a crash between commit and settlement.
 
-| Operation | Policy |
-| --- | --- |
-| `CreateHold`, `ConfirmRecall`, `ReleaseEarly`, `Expire` | `AND('PayerBankMSP.peer','PayeeBankMSP.peer')` |
-| `RequestRecall` | PayerBank |
-| `RaiseDispute` | `AND(raiser, 'NPCIObserverMSP.peer')` |
-| `GetCredit`, `History` | Query only |
+## 5. Authentication and authorisation flow
 
-Open design question: whether a recall should finalise automatically if the payee bank does not respond within a time limit. For the prototype it waits for both banks.
+```mermaid
+sequenceDiagram
+  participant Svc as Service acting as an org
+  participant L as Dev ledger
+  Svc->>Svc: proposal = txId · fn · creator · args
+  Svc->>Svc: each required org signs SigningBytes with its Ed25519 key
+  Svc->>L: POST /tx {proposal, endorsements[]}
+  L->>L: txId seen before? → 409 REPLAY
+  L->>L: every signature verifies against that org's public key? else 401 INVALID_SIGNATURE
+  L->>L: creator among signers? else 401
+  L->>L: signers ⊇ RequiredEndorsers(credit)? else 403 ENDORSEMENT_POLICY_FAILURE
+  L->>L: credit.Apply: role, state and time rules? else 422 REJECTED
+  L-->>Svc: 200 {credit, block}
+```
 
-## 5. Drunix capabilities used
+The ledger receives **public keys only** (`TWOKEY_PUBKEYS`). On Drunix the same roles map to MSP certificates: the creator's MSP ID comes from `GetClientIdentity()`, and endorsement is enforced by the network through a state-based endorsement policy set on each credit key ([`setKeyPolicy`](../chaincode/main.go)).
 
-| Drunix element | How TwoKey uses it |
-| --- | --- |
-| Multi-organisation network design | Three orgs; joint control enforced cryptographically, not by procedure |
-| Chaincode (Go) | `ConditionalCredit` state machine and its contracts |
-| Transient store / private data | VPAs, names and KYC references passed via transient data into a collection shared only by the two banks |
-| SQL state database | Regulator and NPCI-observer queries over held credits (e.g. HIGH-tier holds per bank, recalls by reason code); feeds reconciliation |
-| Fabric Gateway SDK | TypeScript bridge from Python services; chaincode events stream to the read model |
+The HTTP API itself is unauthenticated; see [SECURITY.md](SECURITY.md#residual-risks).
 
-Drunix is NPCI's open-source enterprise fork of Hyperledger Fabric, backward-compatible with Fabric 2.5.x. If Drunix setup stalls, the same design runs on Fabric 2.5.
-
-## 6. Data flow
-
-**Normal path (held credit, no fraud)**
-
-1. Payer app sends a P2P payment to the mock switch.
-2. Switch calls `POST /risk/score`; risk service returns `MEDIUM`/`HIGH`, hold length and reason codes.
-3. Switch submits `CreateHold` through the gateway; both bank peers endorse; state = PENDING.
-4. Chaincode event updates the read model; dashboard shows the hold and its expiry.
-5. At `HoldUntil`, the keeper submits `Expire`; state = RELEASED; mock core banking credits the payee.
-
-**Fraud path**
-
-1. Victim reports to mock 1930 (`POST /report`).
-2. Bank ops (payer bank) submits `RequestRecall`; state = RECALL_REQUESTED.
-3. Payee bank submits `ConfirmRecall`, endorsed by both; state = RECALLED.
-4. Mock core banking refunds the payer; the full event history is queryable via `History`.
-
-## 7. Trust boundaries and sensitive data
+## 6. Data and trust boundaries
 
 ```mermaid
 flowchart LR
-  subgraph Bank_private["Visible only to the two banks"]
-    V["VPAs, names, KYC refs<br/>(private data collection)"]
+  subgraph Bank["Each bank's own systems (mock: world.py)"]
+    O["Cleartext VPAs, names, balances,<br/>payment history, risk features"]
   end
-  subgraph Shared["Visible to all three orgs"]
-    S["Salted hashes, amounts, tier,<br/>reason codes, states, events"]
+  subgraph Private["Private data collection (Drunix only, planned)"]
+    V["VPAs, KYC refs<br/>payer + payee bank only"]
   end
-  subgraph OffChain["Each bank's own systems"]
-    O["Core banking, customer records"]
+  subgraph Shared["Shared ledger (all orgs)"]
+    S["txnRef, amount, banks, HMAC-SHA256(salt, VPA),<br/>tier, reason codes, HoldUntil, state, events"]
   end
-  O -->|"transient data"| V
-  V -.->|"hash only"| S
+  O -->|"transient field 'private'"| V
+  O -->|"salted hash only"| S
 ```
 
-- **Shared channel:** salted VPA hashes, amounts, tiers, reason codes, states and events. No personal data.
-- **Private data collection:** VPAs, names and KYC references, restricted to the payer and payee banks of each credit.
-- **Off-chain:** core banking, customer records and model features stay inside each bank's systems.
-- **Authentication and authorisation:** organisation identity comes from Fabric MSP certificates; authorisation is the endorsement policy. The prototype uses the default Fabric CA; production needs HSM-held keys.
-- **Correction:** wrong on-chain state is fixed only by compensating transactions; history is never edited.
+- **Shared:** no personal data. VPAs are HMAC-SHA256 with a network salt (`VPA_HASH_SALT`), so equal VPAs can be linked by members but not reversed without the salt.
+- **Private (planned on Drunix):** [`collections_config.json`](../chaincode/collections_config.json) restricts the collection to the two bank orgs. The chaincode writes cleartext only when it is passed as transient data.
+- **Off-chain:** features and history never leave the bank.
+- **Correction:** history is never edited. Wrong outcomes are fixed by new transactions (dispute → NPCI ruling).
 
-## 8. Error handling and failure scenarios
+## 7. Persistence
 
-| Failure | Handling |
-| --- | --- |
-| Duplicate `CreateHold` for one TxnRef | Idempotent: second call returns the existing credit |
-| Keeper service down at expiry | On restart, scans PENDING credits past `HoldUntil` and submits `Expire` |
-| Mock core-banking credit fails after RELEASED | State stays RELEASED; payout job retries with backoff and flags after 3 failures |
-| Gateway loses connection mid-submit | Client re-queries by TxnRef before retrying |
-| Switch, ledger and core banking disagree | Reconciliation job compares all three periodically and raises exceptions |
-| Recall arrives after expiry | Rejected deterministically by state check |
-| Colluding single bank attempts release or recall | Endorsement policy rejects the transaction |
-
-## 9. Deployment architecture
-
-**Prototype (planned):** a single machine running Docker Compose — the Drunix test network (three orgs, Raft orderer), the TypeScript gateway, FastAPI services, PostgreSQL and the dashboard.
-
-**Production (would require):**
-
-- One peer set per participating bank and NPCI, hosted in India (RBI payment-data localisation).
-- HSM-backed keys and a production certificate authority per organisation.
-- Integration with the real UPI switch under NPCI scheme rules, and with bank core banking.
-- An RBI direction permitting risk-based lagged credit.
-
-## 10. Scalability and trade-offs
-
-- **Only held credits touch the ledger.** LOW-tier transfers — expected to be the large majority — never reach Drunix, which keeps ledger load proportional to risky volume, not to all UPI volume.
-- **Why not a central database:** NPCI could hold credits centrally in the switch. The ledger adds enforced two-party control, non-repudiation and a neutral audit trail for disputes and ombudsmen. This trade-off is stated openly rather than hidden.
-- **Raft ordering** tolerates crashes, not malicious orderers; governance therefore rests with known regulated institutions.
-- **Throughput claims** are limited to laptop-network measurements; no production performance is claimed.
-
-## 11. Current vs future architecture
-
-| Area | Current prototype design | Future |
+| Store | Where | Durability |
 | --- | --- | --- |
-| Rails | Mock UPI switch, mock core banking, mock 1930 | NPCI UPI switch, bank CBS, NCRP/CFCFRMS integration |
-| Risk input | Rules first, LightGBM + SHAP as stretch | Bank mule-detection scores, DPIP-style beneficiary risk |
-| Payment types | UPI P2P | IMPS, multi-hop holds |
-| Keys | Default Fabric CA | HSM-backed per-org keys |
-| Network | Single-machine, 3 orgs | Multi-bank network hosted in India |
+| Ledger transactions | `DEVLEDGER_DATA` (`.data/ledger.jsonl`), append-only JSON lines, mode 600 | Survives restart; state and hash chain are rebuilt by replaying the log |
+| Bank world (balances, history) | In memory in the services process | Reset on restart. Credits from earlier sessions still appear, marked "from an earlier demo session" |
+| Simulation results | `simulator/results.json` (committed) | Regenerated by `make simulate` |
+
+A PostgreSQL read model, as in the original design, was not needed for the demo: the dashboard reads the ledger directly. It becomes useful when credits number in the thousands (see the [roadmap](ROADMAP.md)).
+
+## 8. Failure handling
+
+| Failure | Handling | Tested |
+| --- | --- | --- |
+| Ledger unreachable on a risky payment | 503 `LEDGER_UNAVAILABLE`; payment declined **before** any balance changes | ✅ `test_ledger_down_fails_closed` |
+| Duplicate `CreateHold` for one txnRef | Same request → returns existing credit, no new block; different request → 409 | ✅ Go |
+| Replayed transaction | 409 `REPLAY` | ✅ Go + Python |
+| Report after hold ended | Rejected by state machine; helpline answers `TOO_LATE_OR_INVALID` and the case falls back to CFCFRMS | ✅ |
+| Report on an instant (LOW) payment | `NOT_HELD`; existing CFCFRMS route | Manually (dashboard) |
+| Keeper down at expiry | Next keeper run expires every PENDING credit past `HoldUntil` | ✅ (`/api/dev/advance` path) |
+| Crash between ledger commit and settlement | Keeper reconciles the final ledger state into core banking; `settle` is idempotent | ✅ by construction (`settled` flag) |
+| Tampered ledger log | Hash recomputation fails; `/chain` reports `valid: false`; replay re-verifies every signature | ✅ Go |
+
+## 9. Deployment
+
+**Implemented (local):** two processes on one machine, both bound to `127.0.0.1`. See [SETUP.md](SETUP.md).
+
+```mermaid
+flowchart LR
+  B["Browser"] -->|":8000"| A["uvicorn · twokey.app"]
+  A -->|":8081"| D["devledger (Go binary)"]
+  D --- F[(".data/ledger.jsonl")]
+```
+
+**Planned (Drunix test network):** three orgs (PayerBank, PayeeBank, NPCIObserver) with a Raft orderer in Docker, `chaincode/` installed as `conditionalcredit` with `--collections-config chaincode/collections_config.json`, and a Fabric Gateway client replacing [`ledger.py`](../services/twokey/ledger.py). Drunix is backward-compatible with Fabric 2.5.x, so Fabric 2.5 is the fallback.
+
+**Production would require:** one peer set per bank and NPCI hosted in India (RBI data localisation), HSM-held keys, integration with the real UPI switch and bank CBS, and an RBI direction permitting risk-based lagged credit.
+
+## 10. Trade-offs and scalability
+
+- **Only held credits touch the ledger.** In the 1M-transfer simulation, 1.3% of genuine transfers were held under the default policy, so ledger load scales with risky volume, not with all UPI volume.
+- **Why not a central database?** NPCI could hold credits centrally in the switch. A ledger adds enforced two-party control, non-repudiation and a neutral audit trail for disputes. This trade-off is stated openly.
+- **One lock per process** in the services and dev ledger (marked `ponytail:` in code). That is fine for a demo; a real network orders transactions instead.
+- **Raft ordering** on Drunix tolerates crashes, not malicious orderers; governance rests with known regulated institutions.
+- **No performance claims.** Nothing has been benchmarked on a Drunix network.
