@@ -198,6 +198,6 @@ flowchart LR
 
 - **Only held credits touch the ledger.** In the 1M-transfer simulation, 1.3% of genuine transfers were held under the default policy, so ledger load scales with risky volume, not with all UPI volume.
 - **Why not a central database?** NPCI could hold credits centrally in the switch. A ledger adds enforced two-party control, non-repudiation and a neutral audit trail for disputes. This trade-off is stated openly.
-- **One lock per process** in the services and dev ledger (marked `ponytail:` in code). That is fine for a demo; a real network orders transactions instead.
+- **One lock per process** in the services and dev ledger. That is fine for a demo; a real network orders transactions instead.
 - **Raft ordering** on Drunix tolerates crashes, not malicious orderers; governance rests with known regulated institutions.
 - **No performance claims.** Nothing has been benchmarked on a Drunix network.

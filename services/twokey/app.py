@@ -95,7 +95,7 @@ Bank = Literal["PayerBank", "PayeeBank"]
 
 # ---- application ----------------------------------------------------------------
 class TwoKey:
-    """Holds the simulated world and talks to the ledger. ponytail: one lock
+    """Holds the simulated world and talks to the ledger. One lock
     serialises all mutations; per-account locking if this ever needs throughput."""
 
     def __init__(self, settings: Settings, ledger: Ledger):

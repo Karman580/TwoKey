@@ -69,7 +69,7 @@ type logEntry struct {
 	At       int64    `json:"at"`
 }
 
-// Ledger holds world state. ponytail: one global lock; fine for a demo
+// Ledger holds world state. One global lock: fine for a demo
 // ledger, a real network orders transactions instead.
 type Ledger struct {
 	mu      sync.Mutex
